@@ -123,9 +123,9 @@ tab2 = ttk.Frame(tab_control)
 tab3 = ttk.Frame(tab_control)
 tab4 = ttk.Frame(tab_control)
 tab_control.add(tab1,text="Line Selection")
-tab_control.add(tab2,text="Line Validation")
+tab_control.add(tab2,text="Manual Fit")
 tab_control.add(tab3,text="Auto Fit")
-tab_control.add(tab4,text="Manual Fit")
+tab_control.add(tab4,text="Credits")
 tab_control.pack(expand=1,fill='both')
 
 #  ------------------ TAB 1 -----------------------------------------------------------
@@ -220,30 +220,56 @@ scrollbar.grid(row=0, column=1, sticky='ns')
 
 # ------------------ LOG FRAME WIDGETS --------------------
 log = ScrolledText(log_frame, width= 69,height= 20,font = ("Times New Roman",12))
-log.place(relx=0,rely=0)
+log.place(relx=0,rely=0.1)
 log.insert(tk.INSERT,'Here you can see information about the selected lines')
 log_update("")
 
 # --------------------- START TAB2 ----------------------------------------------
-# Na aba2 se encontra a parte de validação dos centros das linhas, aqui é faço uma validação cruzada com as linhas selecionadas
-# e os pontos contidas no arquivo do espectro para verificar se batem
+# Na aba2 é onde faço a separação e ajuste de uma única linha selecionada.
 
 # frames
-line_validation_btn_frame = tk.Frame(tab2, width=200,height = 300,bg='pink')
-line_validation_report_frame = tk.Frame(tab2, width=200,height = 400,bg='white')
-line_validation_btn_frame.place(relx= 0)
-line_validation_report_frame.place(relx= 0.5)
+menu_frame= tk.Frame(tab2)
+menu_frame.place(relx=0,rely=0,relwidth=0.25,relheight=1)
 
+# widgets
+
+# line id selection
+ttk.Separator(menu_frame,orient='vertical').place(relx=0.997,relheight=1)
+id_text = tk.Label(menu_frame,text="Line identification (id)",pady=15)
+id_entry =tk.Entry(menu_frame,width= 10)
+id_text.pack()
+id_entry.pack()
+ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
+
+# relative intensity selection
+relative_intensity_text =tk.Label(menu_frame,text='Relative intensity of the line peak (%)',pady=15)
+relative_intensity_entry = tk.Entry(menu_frame,width=10)
+relative_intensity_text.pack()
+relative_intensity_entry.pack()
+ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
+
+#  Profile selection
+profile_text= tk.Label(menu_frame,text="Select profile",pady=15)
+selected_profile = tk.StringVar()
+profile_text.pack()
+r1 = tk.Radiobutton(menu_frame, text='Gaussian', value='Gaussian', variable=selected_profile).pack(anchor='n',pady= 15)
+r2 = tk.Radiobutton(menu_frame, text='Lorentz',  value='Lorentz', variable=selected_profile).pack(anchor='n',pady= 15)
+r3 = tk.Radiobutton(menu_frame, text='Voigt',    value='Voigt', variable=selected_profile).pack(anchor='n',pady= 15)
+ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
+# buttons
+fit_btn = tk.Button(menu_frame,text='FIT',width=10,height=5,command= lambda: print('FIT\n'))
+plot_fit_btn = tk.Button(menu_frame,text='PLOT FIT',width=10,height=5,command= lambda: print('PLOT FIT\n'))
+fit_btn.pack(fill=tk.BOTH,anchor='n',expand=True)
+plot_fit_btn.pack(fill=tk.BOTH,anchor='s',expand=True)
 
 
 
 # --------------------- START TAB3 ----------------------------------------------
-# Aqui é onde eu faço o ajuste automático  de todas alinhas por um modelo pré selecionado
+# Aqui é onde eu faço o ajuste automático  de todas as linhas por um modelo pré selecionado
 
 
 
 # --------------------- START TAB4 ----------------------------------------------
-# Aqui é o ajuste manual apenas para fins de verificação em suma é parecido com o automatico só que com a liberdade
-# de selecionar a linha uma por uma para analises aprofundadas
+
 
 root.mainloop()
