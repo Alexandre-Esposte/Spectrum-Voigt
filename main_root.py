@@ -8,6 +8,8 @@ from funcoes import *
 from functools import partial
 from tkinter.scrolledtext import ScrolledText
 
+
+#************************Functions for TAB 1*************************************
 def log_update(text):
 
     log.insert(tk.INSERT, text)
@@ -97,7 +99,27 @@ def submited():
     id += 1
 
 
+# *********************Functions for TAB 2**************************************
+def fit_btn_function():
 
+   # first of all we read the entrys
+
+    id_selected = int(id_entry.get())
+    relative_intensity_selected = float(relative_intensity_entry.get().replace(',', '.'))
+
+    aux = list(lines.keys())
+    print(f'id: {id_selected}, int: {relative_intensity_selected}, prof: {selected_profile}, {type(aux[0])}\n')
+
+    if id_selected not in lines:
+        text_t2.set("Line not found, please check the ID")
+        return
+
+
+    text_t2.set(f"ID {id_selected} was found and now the line is fitting by {selected_profile}. Please wait !")
+    return
+
+
+#------------------------------FUNCTIONS END-----------------------------------------------
 
 # Some global variables
 x_espec = []
@@ -229,9 +251,16 @@ log_update("")
 
 # frames
 menu_frame= tk.Frame(tab2)
+text_tab2_frame=tk.Frame(tab2,bg='white')
+
 menu_frame.place(relx=0,rely=0,relwidth=0.25,relheight=1)
+text_tab2_frame.place(relx=0.25,relwidth=1,relheight=0.05)
 
 # widgets
+
+#text on text_tab2_frame
+text_t2 = tk.StringVar()
+text_tab2 = tk.Label(text_tab2_frame,textvariable=text_t2,bg='white').place(relx=0,rely=0.25,relheight=0.5,relwidth= 0.5)
 
 # line id selection
 ttk.Separator(menu_frame,orient='vertical').place(relx=0.997,relheight=1)
@@ -256,9 +285,11 @@ r1 = tk.Radiobutton(menu_frame, text='Gaussian', value='Gaussian', variable=sele
 r2 = tk.Radiobutton(menu_frame, text='Lorentz',  value='Lorentz', variable=selected_profile).pack(anchor='n',pady= 15)
 r3 = tk.Radiobutton(menu_frame, text='Voigt',    value='Voigt', variable=selected_profile).pack(anchor='n',pady= 15)
 ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
+
 # buttons
-fit_btn = tk.Button(menu_frame,text='FIT',width=10,height=5,command= lambda: print('FIT\n'))
-plot_fit_btn = tk.Button(menu_frame,text='PLOT FIT',width=10,height=5,command= lambda: print('PLOT FIT\n'))
+fit_btn = tk.Button(menu_frame,text='FIT',width=10,height=5,command= fit_btn_function)
+plot_fit_btn = tk.Button(menu_frame,text='PLOT FIT',width=10,height=5)
+
 fit_btn.pack(fill=tk.BOTH,anchor='n',expand=True)
 plot_fit_btn.pack(fill=tk.BOTH,anchor='s',expand=True)
 
