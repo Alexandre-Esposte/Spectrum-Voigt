@@ -108,14 +108,17 @@ def fit_btn_function():
     relative_intensity_selected = float(relative_intensity_entry.get().replace(',', '.'))
 
     aux = list(lines.keys())
-    print(f'id: {id_selected}, int: {relative_intensity_selected}, prof: {selected_profile}, {type(aux[0])}\n')
+    print(f'id: {id_selected}, int: {relative_intensity_selected}, prof: {selected_profile.get()}, {type(aux[0])}\n')
 
     if id_selected not in lines:
         text_t2.set("Line not found, please check the ID")
         return
 
+    text_t2.set(f"ID {id_selected} was found and now the line is fitting by {selected_profile.get()}. Please wait !")
+   # Aqui entra as funções para o ajuste
 
-    text_t2.set(f"ID {id_selected} was found and now the line is fitting by {selected_profile}. Please wait !")
+
+    text_t2.set("")
     return
 
 
