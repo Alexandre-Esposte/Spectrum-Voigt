@@ -7,9 +7,100 @@ from tkinter.messagebox import askyesno
 from funcoes import *
 from functools import partial
 from tkinter.scrolledtext import ScrolledText
+import matplotlib.pyplot as plt
+from mpl_point_clicker import clicker
+from mpl_interactions import zoom_factory, panhandler
+from mpl_interactions.widgets import scatter_selector_index
+import mplcursors
+from mpldatacursor import datacursor
+from scipy.optimize import leastsq, curve_fit
+from lmfit import minimize, Parameters , Minimizer, report_fit
+from lmfit.models import *
+
+# Some global variables
+x_espec = []
+y_espec = []
+width_root = 1020
+height_root = 660
+lines = {}
+id = 1
+arquivo= None
+center_x = []
+center_y = []
 
 
 #************************Functions for TAB 1*************************************
+def read_spectrum():
+    global arquivo,x_espec,y_espec
+
+    print(f"Nome do arquivo: {arquivo}")
+
+    df = pd.read_csv(arquivo)
+
+    x = df['LinePosition(cm-1)']
+
+    y = df['Intensity']
+
+    x = list(x)
+    y = list(y)
+
+    resultado = {}
+    aux = dict(zip(x, y))
+
+    x = sorted(x)
+
+    for i in x:
+        resultado[i] = aux[i]
+
+    x_espec = list(resultado.keys())
+    y_espec = list(resultado.values())
+    plot_spectrum()
+
+def load_spectrum(center_x,center_y):
+    '''Está função faz o carregamento do espectro'''
+
+    global arquivo
+    arquivo = askopenfilename()
+    read_spectrum()
+
+def plot_spectrum():
+    '''Está função tem como objetivo plotar o espectro bem como também
+    o centro das linhas selecionadas'''
+
+    global center_x,center_y,arquivo,x_espec,y_espec
+
+    print(f"{len(x_espec)}")
+    fig, ax = plt.subplots(constrained_layout=True)
+    lines = ax.plot(x_espec, y_espec)
+    ax.scatter(center_x,center_y,c='orange',linewidths = 1.0,alpha=1)
+
+    disconnect_zoom = zoom_factory(ax)
+    pan_handler = panhandler(fig, button=3)
+    mplcursors.cursor(lines, multiple='True')
+
+    plt.title(f'{arquivo}')
+    plt.show()
+
+
+def line_verification(wavenumber):
+
+    wavenumber = float(wavenumber)
+    x_espec_array = np.array(x_espec)
+    y_espec_array = np.array(y_espec)
+    deviation = np.abs(wavenumber - x_espec_array)
+    index_min = np.where(deviation == deviation.min())[0][0]
+
+
+    if(wavenumber in x_espec):
+        text= f"Wavenumber selected: {wavenumber}\n\nIntensity: {y_espec[index_min]}\n\nIs in spectrum's file?: Yes "
+
+    else:
+        text= f"Wavenumber selected: {wavenumber}\n\nIs in spectrum's file?: No\n\nCorrect wavenumber: {x_espec_array[index_min]}\n\nItensity: {y_espec[index_min]}\n\nDeviation |selected wavenumber - real wavenumber|: {deviation.min()}"
+
+
+
+    return x_espec[index_min],y_espec[index_min],text
+
 def log_update(text):
 
     log.insert(tk.INSERT, text)
@@ -100,40 +191,155 @@ def submited():
 
 
 # *********************Functions for TAB 2**************************************
+def separa_pontos_manual(id,intensidade_relativa):
+
+    global x_espec,y_espec
+
+    #x_espec,y_espec = load_spec2()
+
+    linha = lines[id].tolist()
+
+    centro = float(linha[2])
+
+    pontosx = []
+    pontosy = []
+
+    # intensidade do centro e dos pontos adjacentes
+    icentro = float(linha[3])
+    iponto = float(linha[3] )# só inicializando a variável, preciso disso para entrar no while (1 > intensidade_relativa)
+
+    esquerda_x = []
+    esquerda_y = []
+
+    direita_x = []
+    direita_y = []
+
+
+    i = 1
+
+    # para a esquerda
+    while (iponto / icentro >= intensidade_relativa):
+
+        # aqui é de fato o valor da intensidade dos pontos adjacentes
+        iponto = y_espec[y_espec.index(icentro) - i]
+
+        if iponto / icentro >= intensidade_relativa:
+            esquerda_x.insert(-i, x_espec[x_espec.index(centro) - i])
+            esquerda_y.insert(-i, y_espec[y_espec.index(icentro) - i])
+
+        # print(i,iponto/icentro)
+        i = i + 1
+
+    # Para direita
+    icentro = float(linha[3])
+    iponto  = float(linha[3])
+    i = 1
+    while (iponto / icentro >= intensidade_relativa):
+
+        iponto = y_espec[y_espec.index(icentro) + i]
+
+        if iponto / icentro >= intensidade_relativa:
+            direita_x.insert(i, x_espec[x_espec.index(centro) + i])
+            direita_y.insert(i, y_espec[y_espec.index(icentro) + i])
+
+        i = i + 1
+
+    pontos_x = esquerda_x + [centro] + direita_x
+
+    pontos_y = esquerda_y + [icentro] + direita_y
+
+    return pontos_x, pontos_y
+
 def fit_btn_function():
 
    # first of all we read the entrys
 
     id_selected = int(id_entry.get())
     relative_intensity_selected = float(relative_intensity_entry.get().replace(',', '.'))
+    temperature_selected = float(temperature_entry.get().replace(',','.'))
 
-    aux = list(lines.keys())
-    print(f'id: {id_selected}, int: {relative_intensity_selected}, prof: {selected_profile.get()}, {type(aux[0])}\n')
+    #aux = list(lines.keys())
+    print(f'id: {id_selected}, int: {relative_intensity_selected}, prof: {selected_profile.get()}, {type(selected_profile.get())}\n')
 
     if id_selected not in lines:
         text_t2.set("Line not found, please check the ID")
         return
 
     text_t2.set(f"ID {id_selected} was found and now the line is fitting by {selected_profile.get()}. Please wait !")
+
    # Aqui entra as funções para o ajuste
+
+    points_x, points_y = separa_pontos_manual(id_selected, relative_intensity_selected)
+
+
+
+    gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
+    sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
+
+
+
+    final, result = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=selected_profile.get())
+
+    print(report_fit(result))
+    plot_line(id_selected,selected_profile.get(),relative_intensity_selected,points_x,points_y,final,result.chisqr)
 
 
     text_t2.set("")
     return
 
 
+def fit_raia(data, ex, chute_centro, chute_sigma, chute_gamma, model):
+
+    data = np.array(data)
+    ex = np.array(ex)
+
+    print(f"data: {type(data)}, ex: {type(ex)}, chute_centro: {type(chute_centro)}, chute_sigma: {type(chute_sigma)}, chute_gama: {type(chute_gamma)},model: {type(model)}")
+
+    if model == 'Gaussian':
+        print("Ajustando com a Gaussiana")
+        modelo = GaussianModel()
+        pars = modelo.guess(data, x=ex)
+
+        pars['sigma'].set(value=chute_sigma, vary=True, expr='')
+        pars['amplitude'].set(value=1, vary=True, expr='')
+        pars['center'].set(value=chute_centro, vary=True, expr='')
+
+    elif model == 'Lorentz':
+        print("Ajustando com a Lorentz")
+        modelo = LorentzianModel()
+        pars = modelo.guess(data, x=ex)
+
+        pars['sigma'].set(value=chute_sigma, vary=True, expr='')
+        pars['amplitude'].set(value=1, vary=True, expr='')
+        pars['center'].set(value=chute_centro, vary=True, expr='')
+
+    elif model == 'Voigt':
+        print("Ajustando com a Voigt")
+        modelo = VoigtModel()
+        pars = modelo.guess(data, x=ex)
+
+        pars['gamma'].set(value=chute_gamma, vary=True, expr='')
+        pars['sigma'].set(value=chute_sigma, vary=True, expr='')
+
+        pars['amplitude'].set(value=1, vary=True, expr='')
+        pars['center'].set(value=chute_centro, vary=True, expr='')
+
+
+    result = modelo.fit(data, pars, x=ex)
+
+    final = data + result.residual
+
+    return final, result
+
+def plot_line(id,profile,relative_intensity_selected,points_x,points_y,final,r2):
+    fig, ax = plt.subplots(constrained_layout=True)
+    ax.scatter(points_x, points_y, c='blue', linewidth=1.0, alpha=0.3, label ='Line points')
+    ax.plot(points_x,final,c='black',linewidth=3.5,alpha=1, label=f'Fit by {profile} with chisqr: {r2}')
+    plt.title(f"ID: {id}, profile: {profile}, Int.Rel: {relative_intensity_selected}, Points counts: {len(points_x)} ")
+    plt.legend()
+    plt.show()
 #------------------------------FUNCTIONS END-----------------------------------------------
 
-# Some global variables
-x_espec = []
-y_espec = []
-width_root = 1020
-height_root = 660
-lines = {}
-id = 1
-arquivo= None
-center_x = []
-center_y = []
 
 # Root frame
 root = tk.Tk()
@@ -180,7 +386,7 @@ load_spec_button = ttk.Button(load_frame, text='Load spectrum', command=partial(
 load_spec_button.pack(fill=tk.X)
 
 ttk.Frame(root, height=10).pack()
-plot_spec_button = ttk.Button(load_frame, text='Plot / Replot  spectrum', command= partial(plot_spectrum,center_x,center_y))
+plot_spec_button = ttk.Button(load_frame, text='Plot / Replot  spectrum', command= plot_spectrum)
 plot_spec_button.pack(fill=tk.X)
 
 
@@ -191,8 +397,6 @@ wavenumber_label = tk.Label(entry_center_frame, text='Wavenumber (x)',fg='black'
 wavenumber_entry = tk.Entry(entry_center_frame)
 wavenumber_entry.focus()
 
-#intensity_label = tk.Label(entry_center_frame, text='Intensity (y)',font=14)
-#intensity_entry = tk.Entry(entry_center_frame)
 
 J_label = tk.Label(entry_center_frame, text='Rotational Quantum number (J)',font=14)
 J_entry = tk.Entry(entry_center_frame)
@@ -209,8 +413,6 @@ wavenumber_label.pack()
 wavenumber_entry.pack(fill='x', padx=40)
 tk.Frame(entry_center_frame, height=30).pack()
 
-#intensity_label.pack()
-#intensity_entry.pack(fill=tk.X, padx=40)
 tk.Frame(entry_center_frame, height=30).pack()
 
 J_label.pack()
@@ -280,6 +482,13 @@ relative_intensity_text.pack()
 relative_intensity_entry.pack()
 ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
 
+# temperature selection
+temperature_text =tk.Label(menu_frame,text='Temperature (K)',pady=15)
+temperature_entry = tk.Entry(menu_frame,width=10)
+temperature_text.pack()
+temperature_entry.pack()
+ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
+
 #  Profile selection
 profile_text= tk.Label(menu_frame,text="Select profile",pady=15)
 selected_profile = tk.StringVar()
@@ -291,10 +500,10 @@ ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
 
 # buttons
 fit_btn = tk.Button(menu_frame,text='FIT',width=10,height=5,command= fit_btn_function)
-plot_fit_btn = tk.Button(menu_frame,text='PLOT FIT',width=10,height=5)
+#plot_fit_btn = tk.Button(menu_frame,text='PLOT FIT',width=10,height=5)
 
 fit_btn.pack(fill=tk.BOTH,anchor='n',expand=True)
-plot_fit_btn.pack(fill=tk.BOTH,anchor='s',expand=True)
+#plot_fit_btn.pack(fill=tk.BOTH,anchor='s',expand=True)
 
 
 
