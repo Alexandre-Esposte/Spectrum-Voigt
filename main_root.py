@@ -4,9 +4,9 @@ from tkinter import ttk
 from tkinter.messagebox import showinfo
 from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import askyesno
-from funcoes import *
 from functools import partial
 from tkinter.scrolledtext import ScrolledText
+import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_point_clicker import clicker
 from mpl_interactions import zoom_factory, panhandler
@@ -191,11 +191,23 @@ def submited():
 
 
 # *********************Functions for TAB 2**************************************
+def report(result,model,id,intensidade_relativa,temperatura):
+    text=''
+    log_result_manual.delete('1.0', 'end')
+    text = text + '[[Fit Statistics]]\n\n'
+    text = text + f"Id: {id}\nRelative Intensity: {intensidade_relativa}\nTemperature: {temperatura}K\nModel: {model}\nMethod: {result.method}\nFunction evals: {result.nfev}\nData points: {result.ndata}\nChi square: {result.chisqr}\nReduced chi square: {result.redchi}\n" \
+                  f"RMSE: {np.sqrt(result.chisqr)/result.ndata}\n"
+    text = text + "\n[[Fit Results]]\n\n"
+    for var in result.values:
+        text = text + f"{var}: {result.values[var]} (+/-) {result.params[var].stderr}  ({round(result.params[var].stderr/result.values[var] * 100,2)}%)\n\n"
+
+    text=text + "-/"*50
+    log_result_manual.insert(tk.INSERT, text)
+    return
+
 def separa_pontos_manual(id,intensidade_relativa):
 
     global x_espec,y_espec
-
-    #x_espec,y_espec = load_spec2()
 
     linha = lines[id].tolist()
 
@@ -220,17 +232,21 @@ def separa_pontos_manual(id,intensidade_relativa):
     # para a esquerda
     while (iponto / icentro >= intensidade_relativa):
 
+
         # aqui é de fato o valor da intensidade dos pontos adjacentes
         iponto = y_espec[y_espec.index(icentro) - i]
+
+
 
         if iponto / icentro >= intensidade_relativa:
             esquerda_x.insert(-i, x_espec[x_espec.index(centro) - i])
             esquerda_y.insert(-i, y_espec[y_espec.index(icentro) - i])
 
-        # print(i,iponto/icentro)
+
         i = i + 1
 
     # Para direita
+
     icentro = float(linha[3])
     iponto  = float(linha[3])
     i = 1
@@ -238,9 +254,11 @@ def separa_pontos_manual(id,intensidade_relativa):
 
         iponto = y_espec[y_espec.index(icentro) + i]
 
+
         if iponto / icentro >= intensidade_relativa:
             direita_x.insert(i, x_espec[x_espec.index(centro) + i])
             direita_y.insert(i, y_espec[y_espec.index(icentro) + i])
+
 
         i = i + 1
 
@@ -258,7 +276,7 @@ def fit_btn_function():
     relative_intensity_selected = float(relative_intensity_entry.get().replace(',', '.'))
     temperature_selected = float(temperature_entry.get().replace(',','.'))
 
-    #aux = list(lines.keys())
+
     print(f'id: {id_selected}, int: {relative_intensity_selected}, prof: {selected_profile.get()}, {type(selected_profile.get())}\n')
 
     if id_selected not in lines:
@@ -271,18 +289,16 @@ def fit_btn_function():
 
     points_x, points_y = separa_pontos_manual(id_selected, relative_intensity_selected)
 
-
-
     gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
     sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
-
-
 
     final, result = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=selected_profile.get())
 
     print(report_fit(result))
-    plot_line(id_selected,selected_profile.get(),relative_intensity_selected,points_x,points_y,final,result.chisqr)
 
+    report(result,selected_profile.get(),id_selected,relative_intensity_selected,temperature_selected)
+
+    plot_line(id_selected,selected_profile.get(),relative_intensity_selected,points_x,points_y,final,result.chisqr)
 
     text_t2.set("")
     return
@@ -457,9 +473,11 @@ log_update("")
 # frames
 menu_frame= tk.Frame(tab2)
 text_tab2_frame=tk.Frame(tab2,bg='white')
+result_frame = tk.Frame(tab2,bg='grey')
 
 menu_frame.place(relx=0,rely=0,relwidth=0.25,relheight=1)
 text_tab2_frame.place(relx=0.25,relwidth=1,relheight=0.05)
+result_frame.place(relx=0.25,rely=0.05,relwidth=1,relheight=1)
 
 # widgets
 
@@ -506,6 +524,13 @@ fit_btn.pack(fill=tk.BOTH,anchor='n',expand=True)
 #plot_fit_btn.pack(fill=tk.BOTH,anchor='s',expand=True)
 
 
+#result_var = tk.StringVar()
+#result_var.set("Results Here !!")
+#text_result= tk.Label(result_frame,textvariable=result_var)
+#text_result.place(relx=  0.20,rely=0.2)
+
+log_result_manual = ScrolledText(result_frame, width= 69,height= 20,font = ("Times New Roman",12))
+log_result_manual.place(relx=0,rely=0 ,relwidth=0.90,relheight=1)
 
 # --------------------- START TAB3 ----------------------------------------------
 # Aqui é onde eu faço o ajuste automático  de todas as linhas por um modelo pré selecionado
