@@ -354,6 +354,35 @@ def plot_line(id,profile,relative_intensity_selected,points_x,points_y,final,r2)
     plt.title(f"ID: {id}, profile: {profile}, Int.Rel: {relative_intensity_selected}, Points counts: {len(points_x)} ")
     plt.legend()
     plt.show()
+
+
+# *********************Functions for TAB 3**************************************
+def fit_btn_auto_function():
+
+   # first of all we read the entrys
+
+    relative_intensity_selected = float(relative_intensity_entry_auto.get().replace(',', '.'))
+    temperature_selected = float(temperature_entry_auto.get().replace(',','.'))
+
+    for line in lines:
+        print(f'id: {line}, int: {relative_intensity_selected}, prof: {selected_profile_auto.get()}, {type(selected_profile_auto.get())}\n')
+
+
+        text_t3.set(f"ID {line} was found and now the line is fitting by {selected_profile_auto.get()}. Please wait !")
+
+   # Aqui entra as funções para o ajuste
+
+    #points_x, points_y = separa_pontos_manual(id_selected, relative_intensity_selected)
+
+    #gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
+    #sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
+
+    #final, result = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=selected_profile.get())
+
+    #print(report_fit(result))
+
+    text_t3.set("")
+    return
 #------------------------------FUNCTIONS END-----------------------------------------------
 
 
@@ -523,19 +552,58 @@ fit_btn = tk.Button(menu_frame,text='FIT',width=10,height=5,command= fit_btn_fun
 fit_btn.pack(fill=tk.BOTH,anchor='n',expand=True)
 #plot_fit_btn.pack(fill=tk.BOTH,anchor='s',expand=True)
 
-
-#result_var = tk.StringVar()
-#result_var.set("Results Here !!")
-#text_result= tk.Label(result_frame,textvariable=result_var)
-#text_result.place(relx=  0.20,rely=0.2)
-
+# result report
 log_result_manual = ScrolledText(result_frame, width= 69,height= 20,font = ("Times New Roman",12))
 log_result_manual.place(relx=0,rely=0 ,relwidth=0.90,relheight=1)
 
 # --------------------- START TAB3 ----------------------------------------------
+
 # Aqui é onde eu faço o ajuste automático  de todas as linhas por um modelo pré selecionado
+menu_auto_frame= tk.Frame(tab3)
+text_tab3_frame=tk.Frame(tab3,bg='white')
+result_auto_frame = tk.Frame(tab3,bg='grey')
+
+menu_auto_frame.place(relx=0,rely=0,relwidth=0.25,relheight=1)
+text_tab3_frame.place(relx=0.25,relwidth=1,relheight=0.05)
+result_auto_frame.place(relx=0.25,rely=0.05,relwidth=1,relheight=1)
 
 
+#text on text_tab3_frame
+text_t3 = tk.StringVar()
+text_tab3 = tk.Label(text_tab3_frame,textvariable=text_t3,bg='white').place(relx=0,rely=0.25,relheight=0.5,relwidth= 0.5)
+
+
+# relative intensity selection
+relative_intensity_text_auto =tk.Label(menu_auto_frame,text='Relative intensity of the line peak (%)',pady=15)
+relative_intensity_entry_auto = tk.Entry(menu_auto_frame,width=10)
+relative_intensity_text_auto.pack()
+relative_intensity_entry_auto.pack()
+ttk.Separator(menu_auto_frame,orient='horizontal').pack(fill='x',pady=5)
+
+# temperature selection
+temperature_text_auto =tk.Label(menu_auto_frame,text='Temperature (K)',pady=15)
+temperature_entry_auto = tk.Entry(menu_auto_frame,width=10)
+temperature_text_auto.pack()
+temperature_entry_auto.pack()
+ttk.Separator(menu_auto_frame,orient='horizontal').pack(fill='x',pady=5)
+
+#  Profile selection
+profile_text_auto= tk.Label(menu_auto_frame,text="Select profile",pady=15)
+selected_profile_auto = tk.StringVar()
+profile_text_auto.pack()
+r1_auto = tk.Radiobutton(menu_auto_frame, text='Gaussian', value='Gaussian', variable=selected_profile_auto).pack(anchor='n',pady= 15)
+r2_auto = tk.Radiobutton(menu_auto_frame, text='Lorentz',  value='Lorentz', variable=selected_profile_auto).pack(anchor='n',pady= 15)
+r3_auto = tk.Radiobutton(menu_auto_frame, text='Voigt',    value='Voigt', variable=selected_profile_auto).pack(anchor='n',pady= 15)
+ttk.Separator(menu_auto_frame,orient='horizontal').pack(fill='x',pady=5)
+
+# buttons
+fit_btn_auto = tk.Button(menu_auto_frame,text='FIT AUTO',width=10,height=5,command= fit_btn_auto_function)
+fit_btn_auto.pack(fill=tk.BOTH,anchor='n',expand=True)
+
+
+# result report
+log_result_auto = ScrolledText(result_auto_frame, width= 69,height= 20,font = ("Times New Roman",12))
+log_result_auto.place(relx=0,rely=0 ,relwidth=0.90,relheight=1)
 
 # --------------------- START TAB4 ----------------------------------------------
 
