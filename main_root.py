@@ -23,6 +23,7 @@ y_espec = []
 width_root = 1020
 height_root = 660
 lines = {}
+results = {}
 id = 1
 arquivo= None
 center_x = []
@@ -191,18 +192,23 @@ def submited():
 
 
 # *********************Functions for TAB 2**************************************
-def report(result,model,id,intensidade_relativa,temperatura):
+def report(result,model,id,intensidade_relativa,temperatura,pressao,delete,tp):
     text=''
-    log_result_manual.delete('1.0', 'end')
-    text = text + '[[Fit Statistics]]\n\n'
-    text = text + f"Id: {id}\nRelative Intensity: {intensidade_relativa}\nTemperature: {temperatura}K\nModel: {model}\nMethod: {result.method}\nFunction evals: {result.nfev}\nData points: {result.ndata}\nChi square: {result.chisqr}\nReduced chi square: {result.redchi}\n" \
-                  f"RMSE: {np.sqrt(result.chisqr)/result.ndata}\n"
+    if delete:
+        log_result_manual.delete('1.0', 'end')
+    text = text + '\n[[Fit Statistics]]\n\n'
+    text = text + f"Id: {id}\nRelative Intensity: {intensidade_relativa}\nTemperature: {temperatura}K\nPressure: {pressao}\nModel: {model}\nMethod: {result.method}\nFunction evals: {result.nfev}\nData points: {result.ndata}\nChi square: {result.chisqr}\nReduced chi square: {result.redchi}\n" \
+                  f"RMSE: {np.sqrt(result.chisqr/result.ndata)}\n"
     text = text + "\n[[Fit Results]]\n\n"
     for var in result.values:
         text = text + f"{var}: {result.values[var]} (+/-) {result.params[var].stderr}  ({round(result.params[var].stderr/result.values[var] * 100,2)}%)\n\n"
 
     text=text + "-/"*50
-    log_result_manual.insert(tk.INSERT, text)
+    if tp == 'manual':
+        log_result_manual.insert(tk.INSERT, text)
+
+    elif tp =='automatic':
+        log_result_auto.insert(tk.INSERT, text)
     return
 
 def separa_pontos_manual(id,intensidade_relativa):
@@ -275,15 +281,16 @@ def fit_btn_function():
     id_selected = int(id_entry.get())
     relative_intensity_selected = float(relative_intensity_entry.get().replace(',', '.'))
     temperature_selected = float(temperature_entry.get().replace(',','.'))
+    pressure_selected = float(pressure_entry.get().replace(',','.'))
+    model_selected = selected_profile.get()
 
-
-    print(f'id: {id_selected}, int: {relative_intensity_selected}, prof: {selected_profile.get()}, {type(selected_profile.get())}\n')
+    print(f'id: {id_selected}, int: {relative_intensity_selected}, prof: {model_selected}, {type(model_selected)}\n')
 
     if id_selected not in lines:
         text_t2.set("Line not found, please check the ID")
         return
 
-    text_t2.set(f"ID {id_selected} was found and now the line is fitting by {selected_profile.get()}. Please wait !")
+    text_t2.set(f"ID {id_selected} was found and now the line is fitting by {model_selected}. Please wait !")
 
    # Aqui entra as funções para o ajuste
 
@@ -292,13 +299,13 @@ def fit_btn_function():
     gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
     sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
 
-    final, result = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=selected_profile.get())
+    final, result = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected)
 
     print(report_fit(result))
 
-    report(result,selected_profile.get(),id_selected,relative_intensity_selected,temperature_selected)
+    report(result,model_selected,id_selected,relative_intensity_selected,temperature_selected,pressure_selected,delete= True,tp='manual')
 
-    plot_line(id_selected,selected_profile.get(),relative_intensity_selected,points_x,points_y,final,result.chisqr)
+    plot_line(id_selected,model_selected,relative_intensity_selected,points_x,points_y,final,result.chisqr)
 
     text_t2.set("")
     return
@@ -356,32 +363,92 @@ def plot_line(id,profile,relative_intensity_selected,points_x,points_y,final,r2)
     plt.show()
 
 
-# *********************Functions for TAB 3**************************************
+# -\-\-\-\-\-\-\--\\-\\--\-\-\-\ Functions for TAB 3 --\\-\-\-\-\-\-\-\-\-\-\--\-\-\-\-\-\
+
+def result_record(result, model_selected, line, temperature, pressure):
+    global  results
+    #[id, J, Branch, Wavenumber, Intensity, pressure, temperature, model, npoints, rms, amplitude, amplitude_std, center,center_std, sigma, sigma_std, gamma, gamma_std, fwhm, fhwm_std, height, height_std]
+
+    result_list =[]
+    # id = line
+    result_list.append(line)
+
+    #J
+    result_list.append(lines[line][0])
+
+    #Branch
+    result_list.append(lines[line][1])
+
+    #Wavenumber
+    result_list.append(lines[line][2])
+
+    #Intensity
+    result_list.append(lines[line][3])
+
+    #pressure
+    result_list.append(pressure)
+
+    #temperature
+    result_list.append(temperature)
+
+    #model
+    result_list.append(model_selected)
+
+    # Number of points used
+    result_list.append(result.ndata)
+
+    #rms
+    result_list.append(np.sqrt(result.chisqr/result.ndata))
+
+    # params
+    for var in result.values:
+        result_list.append(result.values[var])
+        result_list.append(result.params[var].stderr)
+
+    if model_selected != 'Voigt':
+        gamma = np.nan
+        gamma_std = np.nan
+        result_list.insert(16,gamma)
+        result_list.insert(17,gamma_std)
+
+    results[line] = result_list
+    return
+
 def fit_btn_auto_function():
 
    # first of all we read the entrys
+    acumulate_rms = 0
+    if(len(list(lines.keys())) == 0):
+        text_t3.set("You need to select lines !!")
 
     relative_intensity_selected = float(relative_intensity_entry_auto.get().replace(',', '.'))
     temperature_selected = float(temperature_entry_auto.get().replace(',','.'))
-
+    pressure_selected = float(pressure_entry_auto.get().replace(',','.'))
+    model_selected = selected_profile_auto.get()
+    text_t3.set(f"Fitting, please wait !")
     for line in lines:
-        print(f'id: {line}, int: {relative_intensity_selected}, prof: {selected_profile_auto.get()}, {type(selected_profile_auto.get())}\n')
+        print(f'id: {line}, int: {relative_intensity_selected}, prof: {model_selected}, {type(model_selected)}\n')
 
 
-        text_t3.set(f"ID {line} was found and now the line is fitting by {selected_profile_auto.get()}. Please wait !")
+        points_x, points_y = separa_pontos_manual(line, relative_intensity_selected)
 
-   # Aqui entra as funções para o ajuste
+        gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[line].tolist()[2])
+        sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[line].tolist()[2])
 
-    #points_x, points_y = separa_pontos_manual(id_selected, relative_intensity_selected)
+        final, result = fit_raia(points_y, points_x, chute_centro=float(lines[line].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected)
 
-    #gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
-    #sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
+        report(result, model_selected, line, relative_intensity_selected, temperature_selected, pressure_selected,delete= False,tp='automatic')
+        print(report_fit(result))
+        acumulate_rms = acumulate_rms + np.sqrt(result.chisqr/result.ndata)
 
-    #final, result = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=selected_profile.get())
+        # O dicionario results é similar ao dicionario lines, só que com os resultados e o conteudo da chave será uma lista em vez de um array
+        # chave = Id, elementos = lista
+        # lista = [id,J,Branch,Wavenumber,Intensity,pressure,temperature,model,npoints,rms,amplitude,amplitude_std,center,center_std,sigma,sigma_std,gamma,gamma_std,fwhm,fhwm_std,height,height_std]
+        result_record(result, model_selected, line, temperature_selected, pressure_selected)
+        print("-\-\-\-\-"*50)
 
-    #print(report_fit(result))
-
-    text_t3.set("")
+        rms_average = acumulate_rms/len(list(lines.keys()))
+        text_t3.set(f"Rms average: {rms_average}")
     return
 #------------------------------FUNCTIONS END-----------------------------------------------
 
@@ -536,6 +603,13 @@ temperature_text.pack()
 temperature_entry.pack()
 ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
 
+# pressure selection
+pressure_text =tk.Label(menu_frame,text='Pressure',pady=15)
+pressure_entry = tk.Entry(menu_frame,width=10)
+pressure_text.pack()
+pressure_entry.pack()
+ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
+
 #  Profile selection
 profile_text= tk.Label(menu_frame,text="Select profile",pady=15)
 selected_profile = tk.StringVar()
@@ -570,9 +644,12 @@ result_auto_frame.place(relx=0.25,rely=0.05,relwidth=1,relheight=1)
 
 #text on text_tab3_frame
 text_t3 = tk.StringVar()
-text_tab3 = tk.Label(text_tab3_frame,textvariable=text_t3,bg='white').place(relx=0,rely=0.25,relheight=0.5,relwidth= 0.5)
+text_tab3 = tk.Label(text_tab3_frame,textvariable=text_t3,bg='white').place(relx=0.20,rely=0.25,relheight=0.5,relwidth= 0.5)
 
+btn_clear_auto = tk.Button(text_tab3_frame,text='Clear results log',command=lambda: log_result_auto.delete('1.0', 'end')).place(relx=0)
+toco = tk.Button(text_tab3_frame,text='results',command=lambda: print(results)).place(relx=0.15)
 
+ttk.Separator(menu_auto_frame,orient='vertical').place(relx=0.997,relheight=1)
 # relative intensity selection
 relative_intensity_text_auto =tk.Label(menu_auto_frame,text='Relative intensity of the line peak (%)',pady=15)
 relative_intensity_entry_auto = tk.Entry(menu_auto_frame,width=10)
@@ -585,6 +662,13 @@ temperature_text_auto =tk.Label(menu_auto_frame,text='Temperature (K)',pady=15)
 temperature_entry_auto = tk.Entry(menu_auto_frame,width=10)
 temperature_text_auto.pack()
 temperature_entry_auto.pack()
+ttk.Separator(menu_auto_frame,orient='horizontal').pack(fill='x',pady=5)
+
+# pressure selection
+pressure_text_auto =tk.Label(menu_auto_frame,text='Pressure',pady=15)
+pressure_entry_auto = tk.Entry(menu_auto_frame,width=10)
+pressure_text_auto.pack()
+pressure_entry_auto.pack()
 ttk.Separator(menu_auto_frame,orient='horizontal').pack(fill='x',pady=5)
 
 #  Profile selection
