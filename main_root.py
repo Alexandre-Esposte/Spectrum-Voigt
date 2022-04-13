@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.messagebox import showinfo
 from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import asksaveasfile
 from tkinter.messagebox import askyesno
 from functools import partial
 from tkinter.scrolledtext import ScrolledText
@@ -20,10 +21,11 @@ from lmfit.models import *
 # Some global variables
 x_espec = []
 y_espec = []
-width_root = 1020
-height_root = 660
+width_root = 1300#1020
+height_root = 760#660
 lines = {}
 results = {}
+result_replace = []
 id = 1
 arquivo= None
 center_x = []
@@ -276,6 +278,7 @@ def separa_pontos_manual(id,intensidade_relativa):
 
 def fit_btn_function():
 
+    global result_replace
    # first of all we read the entrys
 
     id_selected = int(id_entry.get())
@@ -301,6 +304,7 @@ def fit_btn_function():
 
     final, result = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected)
 
+
     print(report_fit(result))
 
     report(result,model_selected,id_selected,relative_intensity_selected,temperature_selected,pressure_selected,delete= True,tp='manual')
@@ -308,6 +312,8 @@ def fit_btn_function():
     plot_line(id_selected,model_selected,relative_intensity_selected,points_x,points_y,final,result.chisqr)
 
     text_t2.set("")
+
+    result_replace = result
     return
 
 
@@ -362,11 +368,65 @@ def plot_line(id,profile,relative_intensity_selected,points_x,points_y,final,r2)
     plt.legend()
     plt.show()
 
+def replace_btn():
+    #result_replace
 
-# -\-\-\-\-\-\-\--\\-\\--\-\-\-\ Functions for TAB 3 --\\-\-\-\-\-\-\-\-\-\-\--\-\-\-\-\-\
+    id_selected = int(id_entry.get())
+    relative_intensity_selected = float(relative_intensity_entry.get().replace(',', '.'))
+    temperature_selected = float(temperature_entry.get().replace(',', '.'))
+    pressure_selected = float(pressure_entry.get().replace(',', '.'))
+    model_selected = selected_profile.get()
 
+    result_list = []
+
+    result_list =[]
+    # id = line
+    result_list.append(id_selected)
+
+    #J
+    result_list.append(lines[id_selected][0])
+
+    #Branch
+    result_list.append(lines[id_selected][1])
+
+    #Wavenumber
+    result_list.append(lines[id_selected][2])
+
+    #Intensity
+    result_list.append(lines[id_selected][3])
+
+    #pressure
+    result_list.append(pressure_selected)
+
+    #temperature
+    result_list.append(temperature_selected)
+
+    #model
+    result_list.append(model_selected)
+
+    # Number of points used
+    result_list.append(result_replace.ndata)
+
+    #rms
+    result_list.append(np.sqrt(result_replace.chisqr/result_replace.ndata))
+
+    for var in result_replace.values:
+        result_list.append(result_replace.values[var])
+        result_list.append(result_replace.params[var].stderr)
+
+    if model_selected != 'Voigt':
+        gamma = np.nan
+        gamma_std = np.nan
+        result_list.insert(16,gamma)
+        result_list.insert(17,gamma_std)
+
+    results[id_selected] = result_list
+    return
+
+# *************************Functions for TAB 3 ********************************************
 def result_record(result, model_selected, line, temperature, pressure):
-    global  results
+    global results
+
     #[id, J, Branch, Wavenumber, Intensity, pressure, temperature, model, npoints, rms, amplitude, amplitude_std, center,center_std, sigma, sigma_std, gamma, gamma_std, fwhm, fhwm_std, height, height_std]
 
     result_list =[]
@@ -416,6 +476,9 @@ def result_record(result, model_selected, line, temperature, pressure):
 
 def fit_btn_auto_function():
 
+    global results
+
+    results = {}
    # first of all we read the entrys
     acumulate_rms = 0
     if(len(list(lines.keys())) == 0):
@@ -448,8 +511,174 @@ def fit_btn_auto_function():
         print("-\-\-\-\-"*50)
 
         rms_average = acumulate_rms/len(list(lines.keys()))
-        text_t3.set(f"Rms average: {rms_average}")
+        text_t3.set(f"Rms average {model_selected}: {rms_average}")
     return
+
+#***************************** FUNCTIONS FOR TAB4 ******************************************
+
+def results_report():
+
+    tree_log.delete(*tree_log.get_children())
+
+    for i in results:
+        list_to_insert = []
+        list_to_insert.append(results[i][0])
+        list_to_insert = list_to_insert + results[i][5:]
+        tree_log.insert('',tk.END,values = list_to_insert)
+        tree_log.yview_moveto(1)
+
+    return
+def rearrange_to_save():
+    to_save = {}
+    list_aux = []
+
+    # id
+    for i in results:
+        list_aux.append(results[i][0])
+    to_save['id'] = list_aux
+    list_aux=[]
+
+    #j
+    for i in results:
+        list_aux.append(results[i][1])
+    to_save['j'] = list_aux
+    list_aux = []
+
+    #Branch
+    for i in results:
+        list_aux.append(results[i][2])
+    to_save['branch'] = list_aux
+    list_aux = []
+
+    # Wavenumber
+    for i in results:
+        list_aux.append(results[i][3])
+    to_save['wavenumber'] = list_aux
+    list_aux = []
+
+    # Intensity
+    for i in results:
+        list_aux.append(results[i][4])
+    to_save['intensity'] = list_aux
+    list_aux = []
+
+    # Pressure
+    for i in results:
+        list_aux.append(results[i][5])
+    to_save['pressure'] = list_aux
+    list_aux = []
+
+    # temperature
+    for i in results:
+        list_aux.append(results[i][6])
+    to_save['temperature'] = list_aux
+    list_aux = []
+
+    # model
+    for i in results:
+        list_aux.append(results[i][7])
+    to_save['model'] = list_aux
+    list_aux = []
+
+    # npoints
+    for i in results:
+        list_aux.append(results[i][8])
+    to_save['npoints'] = list_aux
+    list_aux = []
+
+    # rms
+    for i in results:
+        list_aux.append(results[i][9])
+    to_save['rms'] = list_aux
+    list_aux = []
+
+    # amplitude
+    for i in results:
+        list_aux.append(results[i][10])
+    to_save['amplitude'] = list_aux
+    list_aux = []
+
+    # amplitude_std
+    for i in results:
+        list_aux.append(results[i][11])
+    to_save['amplitude_std'] = list_aux
+    list_aux = []
+
+    # center
+    for i in results:
+        list_aux.append(results[i][12])
+    to_save['center'] = list_aux
+    list_aux = []
+
+    # center_std
+    for i in results:
+        list_aux.append(results[i][13])
+    to_save['center_std'] = list_aux
+    list_aux = []
+
+    # sigma
+    for i in results:
+        list_aux.append(results[i][14])
+    to_save['sigma'] = list_aux
+    list_aux = []
+
+    # sigma_std
+    for i in results:
+        list_aux.append(results[i][15])
+    to_save['sigma_std'] = list_aux
+    list_aux = []
+
+    # gamma
+    for i in results:
+        list_aux.append(results[i][16])
+    to_save['gamma'] = list_aux
+    list_aux = []
+
+    # gamma_std
+    for i in results:
+        list_aux.append(results[i][17])
+    to_save['gamma_std'] = list_aux
+    list_aux = []
+
+    # fwhm
+    for i in results:
+        list_aux.append(results[i][18])
+    to_save['fwhm'] = list_aux
+    list_aux = []
+
+    # fwhm_std
+    for i in results:
+        list_aux.append(results[i][19])
+    to_save['fwhm_std'] = list_aux
+    list_aux = []
+
+    # height
+    for i in results:
+        list_aux.append(results[i][20])
+    to_save['height'] = list_aux
+    list_aux = []
+
+    # height_std
+    for i in results:
+        list_aux.append(results[i][21])
+    to_save['height_std'] = list_aux
+    list_aux = []
+
+    return to_save
+
+def save_results():
+
+    to_save = rearrange_to_save()
+
+    df = pd.DataFrame(to_save,index = range(1, len(to_save['id'])+1))
+    files = [('All Files', '*.*'),
+             ('csv', '*.csv')]
+    file = asksaveasfile(mode='w', defaultextension=".csv")
+    if file is None:
+        return
+    path = file.name
+    df.to_csv(path)
+    file.close()
 #------------------------------FUNCTIONS END-----------------------------------------------
 
 
@@ -468,7 +697,7 @@ tab4 = ttk.Frame(tab_control)
 tab_control.add(tab1,text="Line Selection")
 tab_control.add(tab2,text="Manual Fit")
 tab_control.add(tab3,text="Auto Fit")
-tab_control.add(tab4,text="Credits")
+tab_control.add(tab4,text="Save results")
 tab_control.pack(expand=1,fill='both')
 
 #  ------------------ TAB 1 -----------------------------------------------------------
@@ -489,7 +718,7 @@ log_frame = tk.Frame(tab1,width= 570,height= 385)
 # putting the frames
 load_frame.place(relx=0)
 entry_center_frame.place(relx=0.73,rely=0.05)
-submited_frame.place(relx = 0,rely=0.65)#y=400)
+submited_frame.place(relx = 0.1,rely=0.65)#y=400)
 log_frame.place(relx=0.16,rely=0.015)
 
 #---------------------- LOAD FRAME WIDGETS--------------------------------------------------------
@@ -552,8 +781,10 @@ tree.bind('<<TreeviewSelect>>', item_selected)
 
 scrollbar = ttk.Scrollbar(submited_frame, orient=tk.VERTICAL, command=tree.yview)
 tree.configure(yscroll=scrollbar.set)
-tree.grid(row=0, column=0,sticky='nsew')
+tree.grid(row=0, column=0,sticky='nsew',)
 scrollbar.grid(row=0, column=1, sticky='ns')
+
+
 
 
 
@@ -617,13 +848,15 @@ profile_text.pack()
 r1 = tk.Radiobutton(menu_frame, text='Gaussian', value='Gaussian', variable=selected_profile).pack(anchor='n',pady= 15)
 r2 = tk.Radiobutton(menu_frame, text='Lorentz',  value='Lorentz', variable=selected_profile).pack(anchor='n',pady= 15)
 r3 = tk.Radiobutton(menu_frame, text='Voigt',    value='Voigt', variable=selected_profile).pack(anchor='n',pady= 15)
-ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=5)
+ttk.Separator(menu_frame,orient='horizontal').pack(fill='x',pady=3)
 
 # buttons
-fit_btn = tk.Button(menu_frame,text='FIT',width=10,height=5,command= fit_btn_function)
+fit_btn = tk.Button(menu_frame,text='FIT',width=10,height=3,command= fit_btn_function)
 #plot_fit_btn = tk.Button(menu_frame,text='PLOT FIT',width=10,height=5)
+replace_btn = tk.Button(menu_frame,text='REPLACE',width=10,height=3,command= replace_btn)
 
 fit_btn.pack(fill=tk.BOTH,anchor='n',expand=True)
+replace_btn.pack(fill=tk.BOTH,anchor='n',expand=True)
 #plot_fit_btn.pack(fill=tk.BOTH,anchor='s',expand=True)
 
 # result report
@@ -690,6 +923,82 @@ log_result_auto = ScrolledText(result_auto_frame, width= 69,height= 20,font = ("
 log_result_auto.place(relx=0,rely=0 ,relwidth=0.90,relheight=1)
 
 # --------------------- START TAB4 ----------------------------------------------
+# Here i can save the results
+
+butons_frame = tk.Frame(tab4)
+butons_frame.place(relx=0, rely= 0, relwidth=1,relheight=0.1)
+
+log_tab4_frame = tk.Frame(tab4)
+log_tab4_frame.place(relx=0,rely=0.1,relwidth=1,relheight=1)
+
+save_button = tk.Button(butons_frame,text='Save results',command=save_results)
+save_button.place(relx=0,rely=0,relwidth=0.5,relheight=1)
+
+refresh_button = tk.Button(butons_frame,text='Refresh',command=results_report)
+refresh_button.place(relx=0.5,rely=0,relwidth=0.5,relheight=1)
+
+
+columns_log = ('ID', 'Pres', 'Temp', 'Model', 'Npoints', 'RMS', 'Amp', 'Amp_std',
+               'Center', 'Center_std', 'Sigma', 'Sigma_std', 'Gamma', 'Gamma_std', 'FWHM', 'FWHM_std', 'Height', 'Height_std')
+tree_log = ttk.Treeview(log_tab4_frame, columns=columns_log, show='headings')
+tree_log.heading('ID',text='ID')
+'''tree_log.heading('J',text='J')
+tree_log.heading('Branch',text='Branch')
+tree_log.heading('Wavenumber',text='Wavenumber')
+tree_log.heading('Intensity',text='Intensity')'''
+tree_log.heading('Pres',text='Pres')
+tree_log.heading('Temp',text='Temp')
+tree_log.heading('Model',text='Model')
+tree_log.heading('Npoints',text='Npoints')
+tree_log.heading('RMS',text='RMS')
+tree_log.heading('Amp',text='Amp')
+tree_log.heading('Amp_std',text='Amp_std')
+tree_log.heading('Center',text='Center')
+tree_log.heading('Center_std',text='Center_std')
+tree_log.heading('Sigma',text='Sigma')
+tree_log.heading('Sigma_std',text='Sigma_std')
+tree_log.heading('Gamma',text='Gamma')
+tree_log.heading('Gamma_std',text='Gamma_std')
+tree_log.heading('FWHM',text='FWHM')
+tree_log.heading('FWHM_std',text='FWHM_std')
+tree_log.heading('Height',text='Height')
+tree_log.heading('Height_std',text='Height_std')
+
+tree_log.column("ID",width=10)
+'''tree_log.column("J",width=10)
+tree_log.column("Branch",width=55)
+tree_log.column("Wavenumber",width=105)
+tree_log.column("Intensity",width=70)'''
+tree_log.column("Pres",width=50)
+tree_log.column("Temp",width=50)
+tree_log.column("Model",width=60)
+tree_log.column("Npoints",width=63)
+tree_log.column("RMS",width=40)
+tree_log.column("Amp",width=50)
+tree_log.column("Amp_std",width=70)
+tree_log.column("Center",width=60)
+tree_log.column("Center_std",width=90)
+tree_log.column("Sigma",width=60)
+tree_log.column("Sigma_std",width=90)
+tree_log.column("Gamma",width=60)
+tree_log.column("Gamma_std",width=90)
+tree_log.column("FWHM",width=60)
+tree_log.column("FWHM_std",width=85)
+tree_log.column("Height",width=60)
+tree_log.column("Height_std",width=100)
+
+tree_log.bind('<<TreeviewSelect>>', results_report)
+
+scrollbar_log = ttk.Scrollbar(log_tab4_frame, orient=tk.VERTICAL, command=tree_log.yview)
+tree_log.configure(yscroll=scrollbar_log.set)
+#tree_log.grid(row=0, column=0,sticky='nsew')
+tree_log.place(relx=0,rely=0.15,relwidth=1,relheight=1)
+#scrollbar_log.grid(row=0, column=1, sticky='ns')
+scrollbar_log.place(relx=0,rely=0.1)
+
+
 
 
 root.mainloop()
+
+
