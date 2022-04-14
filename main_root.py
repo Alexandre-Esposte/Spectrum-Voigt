@@ -127,6 +127,9 @@ def item_selected(event):
     if answer:
         tree.delete(tree.selection())
         lines.pop(values[0])
+        if values[0] in results:
+            del results[values[0]]
+
         showinfo(title='Sucess',message=f'The line {values[0]} was deleted !!')
         center_x.remove(float(values[3]))
         center_y.remove(float(values[4]))
@@ -194,18 +197,23 @@ def submited():
 
 
 # *********************Functions for TAB 2**************************************
-def report(result,model,id,intensidade_relativa,temperatura,pressao,delete,tp):
+def report(result,model,id,intensidade_relativa,temperatura,pressao,delete,tp,succesful):
     text=''
-    if delete:
-        log_result_manual.delete('1.0', 'end')
-    text = text + '\n[[Fit Statistics]]\n\n'
-    text = text + f"Id: {id}\nRelative Intensity: {intensidade_relativa}\nTemperature: {temperatura}K\nPressure: {pressao}\nModel: {model}\nMethod: {result.method}\nFunction evals: {result.nfev}\nData points: {result.ndata}\nChi square: {result.chisqr}\nReduced chi square: {result.redchi}\n" \
-                  f"RMSE: {np.sqrt(result.chisqr/result.ndata)}\n"
-    text = text + "\n[[Fit Results]]\n\n"
-    for var in result.values:
-        text = text + f"{var}: {result.values[var]} (+/-) {result.params[var].stderr}  ({round(result.params[var].stderr/result.values[var] * 100,2)}%)\n\n"
+    if(succesful):
+        if delete:
+            log_result_manual.delete('1.0', 'end')
+        text = text + '\n[[Fit Statistics]]\n\n'
+        text = text + f"Id: {id}\nRelative Intensity: {intensidade_relativa}\nTemperature: {temperatura}K\nPressure: {pressao}\nModel: {model}\nMethod: {result.method}\nFunction evals: {result.nfev}\nData points: {result.ndata}\nChi square: {result.chisqr}\nReduced chi square: {result.redchi}\n" \
+                      f"RMSE: {np.sqrt(result.chisqr/result.ndata)}\n"
+        text = text + "\n[[Fit Results]]\n\n"
+        for var in result.values:
+            text = text + f"{var}: {result.values[var]} (+/-) {result.params[var].stderr}  ({round(result.params[var].stderr/result.values[var] * 100,2)}%)\n\n"
 
-    text=text + "-/"*50
+        text=text + "-/"*50
+    else:
+        text= text+ f"\nId: {id}\n An error ocurred!! Try to fit with FIT MANUAL, please !\n\n"
+        text = text + "-/" * 50
+
     if tp == 'manual':
         log_result_manual.insert(tk.INSERT, text)
 
@@ -302,12 +310,12 @@ def fit_btn_function():
     gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
     sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[id_selected].tolist()[2])
 
-    final, result = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected)
+    final, result, succesful = fit_raia(points_y, points_x, chute_centro=float(lines[id_selected].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected)
 
 
-    print(report_fit(result))
+    #print(report_fit(result))
 
-    report(result,model_selected,id_selected,relative_intensity_selected,temperature_selected,pressure_selected,delete= True,tp='manual')
+    report(result,model_selected,id_selected,relative_intensity_selected,temperature_selected,pressure_selected,delete= True,tp='manual',succesful= succesful)
 
     plot_line(id_selected,model_selected,relative_intensity_selected,points_x,points_y,final,result.chisqr)
 
@@ -321,6 +329,8 @@ def fit_raia(data, ex, chute_centro, chute_sigma, chute_gamma, model):
 
     data = np.array(data)
     ex = np.array(ex)
+
+    successful = True
 
     print(f"data: {type(data)}, ex: {type(ex)}, chute_centro: {type(chute_centro)}, chute_sigma: {type(chute_sigma)}, chute_gama: {type(chute_gamma)},model: {type(model)}")
 
@@ -354,11 +364,17 @@ def fit_raia(data, ex, chute_centro, chute_sigma, chute_gamma, model):
         pars['center'].set(value=chute_centro, vary=True, expr='')
 
 
-    result = modelo.fit(data, pars, x=ex)
 
-    final = data + result.residual
+    try:
+        result = modelo.fit(data, pars, x=ex)
 
-    return final, result
+        final = data + result.residual
+
+    except:
+        successful = False
+        final = result = 0
+
+    return final, result, successful
 
 def plot_line(id,profile,relative_intensity_selected,points_x,points_y,final,r2):
     fig, ax = plt.subplots(constrained_layout=True)
@@ -424,7 +440,7 @@ def replace_btn():
     return
 
 # *************************Functions for TAB 3 ********************************************
-def result_record(result, model_selected, line, temperature, pressure):
+def result_record(result, model_selected, line, temperature, pressure,succesful):
     global results
 
     #[id, J, Branch, Wavenumber, Intensity, pressure, temperature, model, npoints, rms, amplitude, amplitude_std, center,center_std, sigma, sigma_std, gamma, gamma_std, fwhm, fhwm_std, height, height_std]
@@ -433,43 +449,47 @@ def result_record(result, model_selected, line, temperature, pressure):
     # id = line
     result_list.append(line)
 
-    #J
-    result_list.append(lines[line][0])
+    if(succesful):
+        #J
+        result_list.append(lines[line][0])
 
-    #Branch
-    result_list.append(lines[line][1])
+        #Branch
+        result_list.append(lines[line][1])
 
-    #Wavenumber
-    result_list.append(lines[line][2])
+        #Wavenumber
+        result_list.append(lines[line][2])
 
-    #Intensity
-    result_list.append(lines[line][3])
+        #Intensity
+        result_list.append(lines[line][3])
 
-    #pressure
-    result_list.append(pressure)
+        #pressure
+        result_list.append(pressure)
 
-    #temperature
-    result_list.append(temperature)
+        #temperature
+        result_list.append(temperature)
 
-    #model
-    result_list.append(model_selected)
+        #model
+        result_list.append(model_selected)
 
-    # Number of points used
-    result_list.append(result.ndata)
+        # Number of points used
+        result_list.append(result.ndata)
 
-    #rms
-    result_list.append(np.sqrt(result.chisqr/result.ndata))
+        #rms
+        result_list.append(np.sqrt(result.chisqr/result.ndata))
 
-    # params
-    for var in result.values:
-        result_list.append(result.values[var])
-        result_list.append(result.params[var].stderr)
+        # params
+        for var in result.values:
+            result_list.append(result.values[var])
+            result_list.append(result.params[var].stderr)
 
-    if model_selected != 'Voigt':
-        gamma = np.nan
-        gamma_std = np.nan
-        result_list.insert(16,gamma)
-        result_list.insert(17,gamma_std)
+        if model_selected != 'Voigt':
+            gamma = np.nan
+            gamma_std = np.nan
+            result_list.insert(16,gamma)
+            result_list.insert(17,gamma_std)
+    else:
+        for i in range(1,22):
+            result_list.append(np.nan)
 
     results[line] = result_list
     return
@@ -492,22 +512,22 @@ def fit_btn_auto_function():
     for line in lines:
         print(f'id: {line}, int: {relative_intensity_selected}, prof: {model_selected}, {type(model_selected)}\n')
 
-
         points_x, points_y = separa_pontos_manual(line, relative_intensity_selected)
 
         gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[line].tolist()[2])
         sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[line].tolist()[2])
 
-        final, result = fit_raia(points_y, points_x, chute_centro=float(lines[line].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected)
+        final, result, succesful = fit_raia(points_y, points_x, chute_centro=float(lines[line].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected)
 
-        report(result, model_selected, line, relative_intensity_selected, temperature_selected, pressure_selected,delete= False,tp='automatic')
-        print(report_fit(result))
-        acumulate_rms = acumulate_rms + np.sqrt(result.chisqr/result.ndata)
+        report(result, model_selected, line, relative_intensity_selected, temperature_selected, pressure_selected,delete= False,tp='automatic',succesful= succesful)
+        #print(report_fit(result))
+        if(succesful):
+            acumulate_rms = acumulate_rms + np.sqrt(result.chisqr/result.ndata)
 
         # O dicionario results é similar ao dicionario lines, só que com os resultados e o conteudo da chave será uma lista em vez de um array
         # chave = Id, elementos = lista
         # lista = [id,J,Branch,Wavenumber,Intensity,pressure,temperature,model,npoints,rms,amplitude,amplitude_std,center,center_std,sigma,sigma_std,gamma,gamma_std,fwhm,fhwm_std,height,height_std]
-        result_record(result, model_selected, line, temperature_selected, pressure_selected)
+        result_record(result, model_selected, line, temperature_selected, pressure_selected,succesful=succesful)
         print("-\-\-\-\-"*50)
 
         rms_average = acumulate_rms/len(list(lines.keys()))
@@ -781,7 +801,7 @@ tree.bind('<<TreeviewSelect>>', item_selected)
 
 scrollbar = ttk.Scrollbar(submited_frame, orient=tk.VERTICAL, command=tree.yview)
 tree.configure(yscroll=scrollbar.set)
-tree.grid(row=0, column=0,sticky='nsew',)
+tree.grid(row=0, column=0,sticky='nsew')
 scrollbar.grid(row=0, column=1, sticky='ns')
 
 
