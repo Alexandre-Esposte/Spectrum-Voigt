@@ -564,73 +564,78 @@ def fit_btn_auto_function():
         gam = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[line].tolist()[2])
         sig = np.sqrt((2 * np.log(2) * 1.38e-16 * temperature_selected) / (1.63e-24 * 3e10 * 3e10)) * float(lines[line].tolist()[2])
 
-        if model_selected == "Voigt":
-            vgamma = True
-            vsigma = False
-            final, result, succesful = fit_raia(points_y, points_x, chute_centro=float(lines[line].tolist()[2]),
-                                                chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected,
-                                                vgamma=True, vsigma=True)
+        try:
+            if model_selected == "Voigt":
+                vgamma = True
+                vsigma = False
+                final, result, succesful = fit_raia(points_y, points_x, chute_centro=float(lines[line].tolist()[2]),
+                                                    chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected,
+                                                    vgamma=True, vsigma=True)
 
-            erro_percentual_sigma = (result.params['sigma'].stderr / result.params['sigma'].value) * 100
-            erro_gamma = result.params['gamma'].stderr
-            erro_sigma = result.params['sigma'].stderr
-            erro_ajuste_1 = result.chisqr
-            erro_ajuste_2 = result.chisqr
+                erro_percentual_sigma = (result.params['sigma'].stderr / result.params['sigma'].value) * 100
+                erro_gamma = result.params['gamma'].stderr
+                erro_sigma = result.params['sigma'].stderr
+                erro_ajuste_1 = result.chisqr
+                erro_ajuste_2 = result.chisqr
 
-            if erro_percentual_sigma > 5:
-                erro_percentual_sigma = 0
+                if erro_percentual_sigma > 5:
+                    erro_percentual_sigma = 0
 
-            while (erro_percentual_sigma < 5):
+                while (erro_percentual_sigma < 5):
 
+                    final, result, succesful = fit_raia(points_y, points_x,
+                                                        chute_centro=float(lines[line].tolist()[2]),
+                                                        chute_sigma=float(sig), chute_gamma=float(gam),
+                                                        model=model_selected, vgamma=vgamma, vsigma=vsigma)
+
+                    if vgamma:
+                        vgamma = False
+                        vsigma = True
+                        erro_percentual_gamma = (result.params['gamma'].stderr / result.params['gamma'].value) * 100
+                        erro_gamma = result.params['gamma'].stderr
+                        erro_ajuste_1 = result.chisqr
+
+                    else:
+                        vgamma = True
+                        vsigma = False
+                        erro_percentual_sigma = (result.params['sigma'].stderr / result.params['sigma'].value) * 100
+                        erro_sigma = result.params['sigma'].stderr
+                        erro_ajuste_2 = result.chisqr
+
+                    gam = result.params['gamma'].value
+                    sig = result.params['sigma'].value
+
+                    if np.abs(erro_ajuste_2 - erro_ajuste_1) < 1e-6:
+                        break
+
+            else:
+                final, result, succesful = fit_raia(points_y, points_x, chute_centro=float(lines[line].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected,vgamma = True, vsigma=True)
+
+            if model_selected == "Voigt":
+                # Vamos rodar novamente apenas para ajustar os restantes
                 final, result, succesful = fit_raia(points_y, points_x,
                                                     chute_centro=float(lines[line].tolist()[2]),
                                                     chute_sigma=float(sig), chute_gamma=float(gam),
-                                                    model=model_selected, vgamma=vgamma, vsigma=vsigma)
+                                                    model=model_selected, vgamma=True, vsigma=False)
+                result.params['sigma'].stderr = erro_sigma
 
-                if vgamma:
-                    vgamma = False
-                    vsigma = True
-                    erro_percentual_gamma = (result.params['gamma'].stderr / result.params['gamma'].value) * 100
-                    erro_gamma = result.params['gamma'].stderr
-                    erro_ajuste_1 = result.chisqr
+            report(result, model_selected, line, relative_intensity_selected, temperature_selected, pressure_selected,delete= False,tp='automatic',succesful= succesful)
 
-                else:
-                    vgamma = True
-                    vsigma = False
-                    erro_percentual_sigma = (result.params['sigma'].stderr / result.params['sigma'].value) * 100
-                    erro_sigma = result.params['sigma'].stderr
-                    erro_ajuste_2 = result.chisqr
+            if(succesful):
+                acumulate_rms = acumulate_rms + np.sqrt(result.chisqr/result.ndata)
 
-                gam = result.params['gamma'].value
-                sig = result.params['sigma'].value
+            # O dicionario results é similar ao dicionario lines, só que com os resultados e o conteudo da chave será uma lista em vez de um array
+            # chave = Id, elementos = lista
+            # lista = [id,J,Branch,Wavenumber,Intensity,pressure,temperature,model,npoints,rms,amplitude,amplitude_std,center,center_std,sigma,sigma_std,gamma,gamma_std,fwhm,fhwm_std,height,height_std]
+            result_record(result, model_selected, line, temperature_selected, pressure_selected,succesful=succesful)
+            print("-\-\-\-\-"*50)
 
-                if np.abs(erro_ajuste_2 - erro_ajuste_1) < 1e-6:
-                    break
-
-        else:
-            final, result, succesful = fit_raia(points_y, points_x, chute_centro=float(lines[line].tolist()[2]), chute_sigma=float(sig), chute_gamma=float(gam), model=model_selected,vgamma = True, vsigma=True)
-
-        if model_selected == "Voigt":
-            # Vamos rodar novamente apenas para ajustar os restantes
-            final, result, succesful = fit_raia(points_y, points_x,
-                                                chute_centro=float(lines[line].tolist()[2]),
-                                                chute_sigma=float(sig), chute_gamma=float(gam),
-                                                model=model_selected, vgamma=True, vsigma=False)
-            result.params['sigma'].stderr = erro_sigma
-
-        report(result, model_selected, line, relative_intensity_selected, temperature_selected, pressure_selected,delete= False,tp='automatic',succesful= succesful)
-
-        if(succesful):
-            acumulate_rms = acumulate_rms + np.sqrt(result.chisqr/result.ndata)
-
-        # O dicionario results é similar ao dicionario lines, só que com os resultados e o conteudo da chave será uma lista em vez de um array
-        # chave = Id, elementos = lista
-        # lista = [id,J,Branch,Wavenumber,Intensity,pressure,temperature,model,npoints,rms,amplitude,amplitude_std,center,center_std,sigma,sigma_std,gamma,gamma_std,fwhm,fhwm_std,height,height_std]
-        result_record(result, model_selected, line, temperature_selected, pressure_selected,succesful=succesful)
-        print("-\-\-\-\-"*50)
-
-        rms_average = acumulate_rms/len(list(lines.keys()))
-        text_t3.set(f"Rms average {model_selected}: {rms_average}")
+            rms_average = acumulate_rms/len(list(lines.keys()))
+            text_t3.set(f"Rms average {model_selected}: {rms_average}")
+        except:
+            report(result, model_selected, line, relative_intensity_selected, temperature_selected, pressure_selected,
+                   delete=False, tp='automatic', succesful=0)
+            print(f" linha id {line} deu erro ao ajustar!! \n")
     return
 
 #***************************** FUNCTIONS FOR TAB4 ******************************************
