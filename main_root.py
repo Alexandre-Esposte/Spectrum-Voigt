@@ -17,6 +17,7 @@ from mpldatacursor import datacursor
 from scipy.optimize import leastsq, curve_fit
 from lmfit import minimize, Parameters , Minimizer, report_fit
 from lmfit.models import *
+from scipy import interpolate
 
 # Some global variables
 x_espec = []
@@ -221,6 +222,14 @@ def report(result,model,id,intensidade_relativa,temperatura,pressao,delete,tp,su
         log_result_auto.insert(tk.INSERT, text)
     return
 
+
+def interpolar(x, y, qte=3000):
+    f = interpolate.interp1d(x, y, kind='cubic')
+
+    xnew = np.linspace(x[0], x[-1], qte)
+    ynew = f(xnew)
+
+    return xnew, ynew
 def separa_pontos_manual(id,intensidade_relativa):
 
     global x_espec,y_espec
@@ -281,6 +290,8 @@ def separa_pontos_manual(id,intensidade_relativa):
     pontos_x = esquerda_x + [centro] + direita_x
 
     pontos_y = esquerda_y + [icentro] + direita_y
+
+    pontos_x, pontos_y = interpolar(pontos_x, pontos_y, qte=3000)
 
     return pontos_x, pontos_y
 
